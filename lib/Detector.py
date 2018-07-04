@@ -70,11 +70,12 @@ class DetectorWorkshop(object):
         if self.shape['geometry'] == 'SPHERE':
             self.fiducial_shape['radius'] = pow(3*FV*1.0E9/(4*np.pi),(1.0/3.0))
         print("FIDUCIAL INFO: %s"%(str(self.fiducial_shape)))
-        if self.fiducial_shape['radius'] > self.shape['radius']:
-            warning = ("WARNING: YOU'VE DEFINED A FIDUCIAL VOLUME THATS"+
-            "BIGGER THAN THE VOLUME ENCLOSED BY THE PMTS.  THE LIGHT"+
-            "COLLECTION ALGORITHM WILL NOT WORK PROPERLY.")
-            print(warning)
+        if self.shape['radius'] is not None: 
+            if self.fiducial_shape['radius'] > self.shape['radius']:
+                warning = ("WARNING: YOU'VE DEFINED A FIDUCIAL VOLUME THATS"+
+                "BIGGER THAN THE VOLUME ENCLOSED BY THE PMTS.  THE LIGHT"+
+                "COLLECTION ALGORITHM WILL NOT WORK PROPERLY.")
+                print(warning)
 
     def ShootFVPosition(self, axis=None):
         '''Randomly shoot a position in the fiducial volume defined'''
@@ -116,50 +117,58 @@ class DetectorWorkshop(object):
     def EvaluateLightCollection(self, position):
         '''For a single position, evaluate the light collection parameter'''
         print("EVALUATING LIGHT COLLECTION")
-        light_collection_metric = 0.0 
-        for i in xrange(len(self.PMTs.positions)):
-            PMTPos = np.array(self.PMTs.positions[i])
-            PMTDir = np.array(self.PMTs.directions[i])
-            ObsPos = np.array(position)
-            atn_factor = self._GetAttenuationFactor(PMTPos,ObsPos)
-            solid_angle = self._GetExposedSolidAngle(PMTPos, PMTDir, ObsPos)
-            light_collection_metric += (atn_factor*solid_angle)
+        PMTPos = np.array(self.PMTs.positions)
+        PMTDir = np.array(self.PMTs.directions)
+        ObsPos = np.array(position)
+        atn_factors = self._GetAttenuationFactors(PMTPos,ObsPos)
+        solid_angles = self._GetExposedSolidAngles(PMTPos, PMTDir, ObsPos)
+        light_collection_metric = np.sum(atn_factors*solid_angles)
         return light_collection_metric
 
-    def _GetAttenuationFactor(self, PMTPos, ObsPos):
-        '''Return the light reduction factor associated with
-        the distance between a PMT and the Observation position'''
+    def _GetAttenuationFactors(self, PMTPos, ObsPos):
+        '''Return the light reduction factors associated with
+        the distance between each PMT and the Observation position'''
         pp = PMTPos 
         op = ObsPos 
         r = -pp + op
-        r_mag = np.sqrt(np.dot(r,r))
-        return np.exp(-r_mag*self.attncf) 
+        r_mags = np.sqrt(np.sum(r*r,axis=1)) 
+        attn_factors = np.ones(len(r_mags))*self.attncf
+        return np.exp(-r_mags*attn_factors) 
     
-    def _GetExposedSolidAngle(self, PMTPos, PMTDir, ObsPos):
-        '''Return the exposed solid angle of PMT surface from the
-        PMT at position PMTPos [x,y,z] relative to ObsPos [x,y,z].'''
+    def _GetExposedSolidAngles(self, PMTPos, PMTDir, ObsPos):
+        '''Return the exposed solid angle of PMT surface from each PMT
+        position PMTPos (array of [x,y,z]) relative to the ObsPos [x,y,z].'''
         #Turn given vectors into numpy arrays
         pd = PMTDir
         pp = PMTPos
         op = ObsPos
         r = -pp + op
-        r_mag = np.sqrt(np.dot(r,r))
-        pd_mag = np.sqrt(np.dot(pd,pd))
+        r_mags = np.sqrt(np.sum(r*r,axis=1)) 
+        pd_mags = np.sqrt(np.sum(pd*pd,axis=1)) 
+        a = np.ones(len(PMTPos))*self.a
         #Define the angle and critical angles determining if theres
         #Surface area exposure loss for hemisphere glass PMTs
-        theta = np.arccos(np.dot(r,pd)/(r_mag*pd_mag))
-        theta_crit_low = np.arccos(np.sqrt(1 - (self.a**2/r_mag**2)))
-        theta_crit_high = np.pi - theta_crit_low
+        thetas = np.arccos(np.array(np.sum(r*pd,axis=1))/(r_mags*pd_mags))
+        theta_crit_lows = np.arccos(np.sqrt(1 - (a**2/r_mags**2)))
+        theta_crit_highs = np.pi - theta_crit_lows
         #We've gone through the calculations for the exposed
         #Solid angle based on theta and the theta_crits. Implement
-        if theta > theta_crit_high:
-            exp_solid_angle = 0.0
-        elif theta < theta_crit_low:
-            exp_solid_angle = 2.0*np.pi*(1-np.sqrt(1-(self.a**2/r_mag**2)))
-        else:
-            exp_solid_angle = np.pi*(1-np.sqrt(1-(self.a**2/r_mag**2)))*\
-                    (np.cos(theta)+1)
-        return exp_solid_angle
+        exp_solid_angles = np.zeros(len(PMTPos))
+        #Now, we fill in the solid angles at each entry based on thetas
+        crit_mid_a = np.where(thetas > theta_crit_lows)[0]
+        crit_mid_b = np.where(thetas < theta_crit_highs)[0]
+        crit_mid_indices = np.intersect1d(crit_mid_a,crit_mid_b)
+        cm_thetas = thetas[crit_mid_indices]
+        cm_solid_angles = np.pi*(1-np.sqrt(1-(a[crit_mid_indices]**2/
+                r_mags[crit_mid_indices]**2)))*(np.cos(cm_thetas)+1)
+        exp_solid_angles[crit_mid_indices] = cm_solid_angles
+        
+        crit_low_indices = np.where(thetas < theta_crit_lows)[0]
+        cl_solid_angles = 2.0*np.pi*(1-np.sqrt(1-(a[crit_low_indices]**2/
+            r_mags[crit_low_indices]**2)))
+        exp_solid_angles[crit_low_indices] = cl_solid_angles
+        #NOTE: Exposed solid angles above theta_crit_high are zero 
+        return exp_solid_angles
 
     def _CheckFiducialDefinition(self):
         #Check necessary dimensions are defined

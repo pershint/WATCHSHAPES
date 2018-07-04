@@ -41,7 +41,7 @@ if __name__=='__main__':
     if geometry == "SPHERE":
         pointGen = pp.SpherePoints(numpoints = NUMPMTS, radius=RADIUS)
         pointGen.PopulatePositions()
-        pointGen.ShowPositions()
+        #pointGen.ShowPositions()
     if geometry == "CYLINDER":
         if DEFINE_VIA_BUFFER is True: 
             HEIGHT = WATCHMAN.GetDetectorHeight(BUFFER_VOLUME)
