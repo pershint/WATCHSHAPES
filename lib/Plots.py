@@ -2,6 +2,59 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
+import scipy.optimize as spc
+
+def OOR2(x, p1):
+    return p1/(x**2)
+
+def PlotLightCollection(positions, LC_factors, axis=None):
+    '''For a given axis, plot the light collection as a function of
+    that axis (x,y,or z supported)'''
+    sns.set_style("whitegrid")
+    xkcd_colors = ['slate blue','black']
+    sns.set_palette(sns.xkcd_palette(xkcd_colors))
+    axis_dict = {'x':0, 'y':1, 'z':2} 
+    for a in axis_dict: 
+        if axis==a:
+            theaxis = axis_dict[a] 
+    the_positions = [] 
+    for i in xrange(len(positions)):
+        the_positions.append(positions[i][theaxis])
+    the_positions = np.array(the_positions)
+    LC_factors = np.array(LC_factors)
+    plt.plot(the_positions, LC_factors, linestyle='none',marker='o',markersize=7,
+            label="LC factor")
+    plt.legend(loc=1) 
+    plt.show()
+
+
+def PlotLightCollection_OnePMT(positions, LC_factors, axis=None):
+    '''For a given axis, plot the light collection as a function of
+    that axis (x,y,or z supported)'''
+    sns.set_style("whitegrid")
+    xkcd_colors = ['slate blue','black']
+    sns.set_palette(sns.xkcd_palette(xkcd_colors))
+    axis_dict = {'x':0, 'y':1, 'z':2} 
+    for a in axis_dict: 
+        if axis==a:
+            theaxis = axis_dict[a] 
+    the_positions = [] 
+    for i in xrange(len(positions)):
+        the_positions.append(positions[i][theaxis])
+    the_positions = np.array(the_positions)
+    the_distance = 8203.0 - the_positions
+    LC_factors = np.array(LC_factors)
+    plt.plot(the_distance, LC_factors, linestyle='none',marker='o',markersize=7,
+            label="LC factor")
+    popt, pcov = spc.curve_fit(OOR2, the_distance, LC_factors, p0=[0.01])
+    print("BEST FIT VALUES: " + str(popt))
+    print("PCOVARIANCE: " + str(pcov))
+    x = np.arange(min(the_distance),max(the_distance),
+            (max(the_distance)-min(the_distance))/100.0)
+    bfvals = OOR2(x, popt[0]) 
+    plt.plot(x, bfvals, linewidth=4,label=r'$A/r^{2}$ fit')
+    plt.legend(loc=1) 
+    plt.show()
 
 def ShowPositions(positions):
     if len(positions)<=0:
@@ -20,8 +73,7 @@ def ShowPositions(positions):
         ax.set_xlabel("X position (mm)")
         ax.set_ylabel("Y position (mm)")
         ax.set_zlabel("Z position (mm)")
-        plt.title("%s points distributed across a %s"%(\
-                str(self.numpoints),str(self.geometry)))
+        plt.title("Distribution of positions in input array")
         plt.legend() 
         plt.show()
 

@@ -3,10 +3,13 @@ import playDarts as pd
 import sys
 
 class DetectorWorkshop(object):
-    def __init__(self, PMTInformation=None, geometry=None, fiducial_mass=None):
-        self.shape = {'geometry': geometry,'radius': None, 'height': None}
+    def __init__(self, PMTInformation=None, geometry=None, fiducial_mass=None,density=None,
+            attenuation_length=None):
+        self.shape = {'geometry': geometry,'radius': None, 'height': None,
+                'PMT_center_facing':None}
         self.fiducial_shape = {'geometry': geometry, 'mass':fiducial_mass, \
                 'radius': None, 'height': None}
+        self.medium = {'density': density, 'attenuation_length':attenuation_length}
         if self.fiducial_shape['mass'] is not None:
             self._SetFiducialVolumeDimensions()
         if PMTInformation is not None: 
@@ -14,14 +17,27 @@ class DetectorWorkshop(object):
             self.a = self.PMTs.PMTRadius
             self.shape['PMT_center_facing']= self.PMTs.PMT_center_facing
         #TODO: Associated this with a DB and a selected medium 
-        self.attncf = (1/80000.0)
+        if density is not None:
+            self.density = density
+            self.medium['density'] = density
+        if attenuation_length is not None:
+            self.medium['attenuation_length'] = attenuation_length
+            self.attncf = (1/attenuation_length)
 
     def LoadPMTInfo(self, PMTInfo):
         self.PMTs = PMTInfo
         self.a = self.PMTs.PMTRadius
+        self.shape['PMT_center_facing'] = self.PMTs.PMT_center_facing
 
     def SetAttenuationLength(self, attnlength):
+        '''set the mediums attenuation length in mm''' 
         self.attncf = (1.0/attnlength)
+        self.medium['attenuation_length'] = attnlength
+
+    def SetMediumDensity(self, dens):
+        '''set the detector's medium density in kg/m**3'''
+        self.density = dens
+        self.medium['density'] = dens
 
     def SetGeometry(self, geo):
         self.shape['geometry'] = geo
@@ -44,7 +60,7 @@ class DetectorWorkshop(object):
         '''Given the calculated fiducial volume dimensions, returns
         the detector radius for a cylinder configuration'''
         self._CheckFiducialDefinition()
-        return self.fiducial_shape['height'] + buff
+        return self.fiducial_shape['height'] + 2.0*buff
 
     def SetHeight(self, height):
         if self.shape['geometry'] is not "CYLINDER":
@@ -58,11 +74,20 @@ class DetectorWorkshop(object):
         defined detector shape'''
         if self.fiducial_shape['mass'] is None:
             print("YOU NEED TO DEFINE YOUR FIDUCIAL MASS")
+            return
         #TODO: Add option for change in density here
-        FV = self.fiducial_shape['mass']*1.0 #Units are m**3
+        if self.density is None:
+            print("YOU MUST FIRST DEFINE YOUR DETECTOR DENSITY")
+            sys.exit(0)
+        FV = self.fiducial_shape['mass']*self.density #Units are m**3
         print("HEIGHT,RADIUS: %s,%s"%(self.shape['height'],self.shape['radius']))
         if self.shape['geometry'] == 'CYLINDER':
-            height_radius_ratio = self.shape['height']/self.shape['radius']
+            if self.shape['radius'] is None or self.shape['height'] is None:
+                print("NO RADIUS AND/OR HEIGHT DEFINED IN WORKSHOP. ASSUMING RIGHT "+\
+                        "CYLINDER WITH HEIGHT=2*RADIUS")
+                height_radius_ratio = 2.0
+            else:
+                height_radius_ratio = self.shape['height']/self.shape['radius']
             self.fiducial_shape['radius'] = (FV*1.0E9/(np.pi*height_radius_ratio))**\
                     (1.0/3.0)    
             self.fiducial_shape['height'] = self.fiducial_shape['radius'] * \
@@ -77,19 +102,32 @@ class DetectorWorkshop(object):
                 "COLLECTION ALGORITHM WILL NOT WORK PROPERLY.")
                 print(warning)
 
-    def ShootFVPosition(self, axis=None):
+    def ShootPosition(self, plane=None, axis=None,region='FV'):
         '''Randomly shoot a position in the fiducial volume defined'''
         self._CheckFiducialDefinition()
         u = np.random.random()
+        axis_dict = {'x':0, 'y':1, 'z':2} 
+        if region=='FV':
+            radius = self.fiducial_shape['radius']
+            height = self.fiducial_shape['height']
+        if region=='PMT':
+            radius = self.shape['radius']
+            height = self.shape['height']
         if self.shape['geometry'] == 'SPHERE':
-            if axis=='z':
+            if plane=='zeq0':
                 #Sample from a disc of radius R 
                 z = 0.0
-                r = self.fiducial_shape['radius']*(u**(1.0/2.0))
+                r = radius*(u**(1.0/2.0))
                 phi = np.random.random() * 2.0 * np.pi
                 x = r * np.cos(phi)
                 y = r * np.sin(phi)
                 xyz = np.array([x,y,z])
+            elif axis is not None:
+                for a in axis_dict: 
+                    if axis == a:
+                        xyz = np.zeros(3) 
+                        thevar = ((np.random.random() * radius*2.0) - radius)
+                        xyz[axis_dict[a]] = thevar 
             else:
                 #Shooting from three gaussians of mean 0 and variance 1
                 #Gives points evenly distributed on the unit sphere
@@ -98,25 +136,37 @@ class DetectorWorkshop(object):
                 xyz = xyz/np.sqrt(np.dot(xyz,xyz))
                 #Now, You can't just shoot from 0 to 1 and multiply by
                 #radius; you'll get too many events out at far radii.
-                shot_radius = self.fiducial_shape['radius']*(u**(1.0/3.0))
+                shot_radius = radius*(u**(1.0/3.0))
                 xyz = shot_radius*xyz 
             return xyz
         if self.shape['geometry'] == 'CYLINDER':
             #Shoot for radius, phi, and z.  Convert r,phi to x,y.
-            r = self.fiducial_shape['radius']*(u**(1.0/2.0))
+            r = radius*(u**(1.0/2.0))
             phi = np.random.random() * 2.0 * np.pi
-            if axis=='z':
+            if plane=='zeq0':
                 z = 0.0
-            else: 
-                z = np.random.random()*self.fiducial_shape['height']
-                z = z - (self.fiducial_shape['height']/2.0)
-            x = r * np.cos(phi)
-            y = r * np.sin(phi)
-            return np.array([x,y,z])
+                x = r * np.cos(phi)
+                y = r * np.sin(phi) 
+                return np.array([x,y,z])
+            elif axis is None:
+                z = np.random.random()*height
+                z = z - (height/2.0)
+                x = r * np.cos(phi)
+                y = r * np.sin(phi)
+                return np.array([x,y,z])
+            elif axis is not None:
+                for a in axis_dict: 
+                    if axis == a:
+                        xyz = np.zeros(3) 
+                        if a == 'x' or a == 'y': 
+                            thevar = ((np.random.random() * radius*2.0) - radius)
+                        elif a == 'z':
+                            thevar = ((np.random.random() * height) - height/2.0)
+                        xyz[axis_dict[a]] = thevar 
+                return xyz
 
     def EvaluateLightCollection(self, position):
         '''For a single position, evaluate the light collection parameter'''
-        print("EVALUATING LIGHT COLLECTION")
         PMTPos = np.array(self.PMTs.positions)
         PMTDir = np.array(self.PMTs.directions)
         ObsPos = np.array(position)
@@ -138,7 +188,7 @@ class DetectorWorkshop(object):
     def _GetExposedSolidAngles(self, PMTPos, PMTDir, ObsPos):
         '''Return the exposed solid angle of PMT surface from each PMT
         position PMTPos (array of [x,y,z]) relative to the ObsPos [x,y,z].'''
-        #Turn given vectors into numpy arrays
+        #Turn given vectors into numpy arrays   
         pd = PMTDir
         pp = PMTPos
         op = ObsPos
@@ -148,25 +198,33 @@ class DetectorWorkshop(object):
         a = np.ones(len(PMTPos))*self.a
         #Define the angle and critical angles determining if theres
         #Surface area exposure loss for hemisphere glass PMTs
-        thetas = np.arccos(np.array(np.sum(r*pd,axis=1))/(r_mags*pd_mags))
+        rdotPMTs = np.array(np.sum(r*pd,axis=1))/(r_mags*pd_mags)
+        #There's rounding errors that can make some values greater than 1. 
+        GT1 = np.where(rdotPMTs>1)[0]
+        rdotPMTs[GT1] = 1.0 
+        thetas = np.arccos(rdotPMTs)
         theta_crit_lows = np.arccos(np.sqrt(1 - (a**2/r_mags**2)))
         theta_crit_highs = np.pi - theta_crit_lows
         #We've gone through the calculations for the exposed
         #Solid angle based on theta and the theta_crits. Implement
         exp_solid_angles = np.zeros(len(PMTPos))
         #Now, we fill in the solid angles at each entry based on thetas
-        crit_mid_a = np.where(thetas > theta_crit_lows)[0]
-        crit_mid_b = np.where(thetas < theta_crit_highs)[0]
-        crit_mid_indices = np.intersect1d(crit_mid_a,crit_mid_b)
-        cm_thetas = thetas[crit_mid_indices]
-        cm_solid_angles = np.pi*(1-np.sqrt(1-(a[crit_mid_indices]**2/
-                r_mags[crit_mid_indices]**2)))*(np.cos(cm_thetas)+1)
-        exp_solid_angles[crit_mid_indices] = cm_solid_angles
-        
         crit_low_indices = np.where(thetas < theta_crit_lows)[0]
+        cl_thetas = thetas[crit_low_indices] 
         cl_solid_angles = 2.0*np.pi*(1-np.sqrt(1-(a[crit_low_indices]**2/
             r_mags[crit_low_indices]**2)))
         exp_solid_angles[crit_low_indices] = cl_solid_angles
+        
+        crit_mid_a = np.where(thetas >= theta_crit_lows)[0]
+        crit_mid_b = np.where(thetas <= theta_crit_highs)[0]
+        crit_mid_indices = np.intersect1d(crit_mid_a,crit_mid_b)
+        cm_thetas = thetas[crit_mid_indices]
+        cm_alphas = theta_crit_lows[crit_mid_indices]
+        ang_factors = ((np.cos(cm_thetas)/np.cos(cm_alphas))+1)
+        cm_solid_angles = np.pi*(1-np.sqrt(1-(a[crit_mid_indices]**2/
+                r_mags[crit_mid_indices]**2)))*ang_factors
+
+        exp_solid_angles[crit_mid_indices] = cm_solid_angles 
         #NOTE: Exposed solid angles above theta_crit_high are zero 
         return exp_solid_angles
 
