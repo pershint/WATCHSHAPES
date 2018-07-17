@@ -12,6 +12,10 @@ def OOR2(x, p1):
 def PlotFVLC_sphere(positions, LC_factors,detector_specs):
     '''For a given geometry, plot the light collection as a function of
     that axis (x,y,or z supported)'''
+    sns.set_style("darkgrid")
+    xkcd_colors = ['light eggplant', 'clay', 'leaf',
+            'aqua blue','vomit', 'red','twilight']
+    sns.set_palette(sns.xkcd_palette(xkcd_colors))#,len(self.sac_percut)))
     R3_FV = detector_specs['radius']**3 
     data_dict = {'x': [], 'y': [], 'z': [], 'R3': [], 'LC': []} 
     axis_dict = {'x':0, 'y':1, 'z':2} 
@@ -33,7 +37,7 @@ def PlotFVLC_sphere(positions, LC_factors,detector_specs):
     plt.ion()
     plt.show()
 
-def PlotFVLC_cylinder(positions, LC_factors,detector_specs,griddims=[38,38]):
+def PlotFVLC_cylinder(positions, LC_factors,detector_specs,griddims=[20,20],hbounds=None):
     '''For a given geometry, plot the light collection as a function of
     that axis (x,y,or z supported)'''
     rho2_FV = detector_specs['radius']**2 
@@ -73,9 +77,14 @@ def PlotFVLC_cylinder(positions, LC_factors,detector_specs,griddims=[38,38]):
             therealdeal=pandas.concat([therealdeal,b],ignore_index=True)
     print(therealdeal)
     hm = therealdeal.pivot(index='zavg',columns='rho2', values='LC')
-    #print(hm) 
-    ax = sns.heatmap(hm,cmap=plt.get_cmap('ocean'),\
-            cbar_kws={'label':'PC%'})
+    #print(hm)
+    if hbounds is None:
+        ax = sns.heatmap(hm,cmap=plt.get_cmap('ocean'),\
+                cbar_kws={'label':'PC%'})
+    else:
+        ax = sns.heatmap(hm,cmap=plt.get_cmap('ocean'),\
+                cbar_kws={'label':'PC%'},vmin=hbounds[0],
+                vmax=hbounds[1])
     plt.xlabel(r'$(\rho/\rho_{PMT})^{2}$',fontsize=24)
     plt.ylabel(r'$Z \, (mm)$',fontsize=24)
     plt.title("Effective photocoverage in WATCHMAN",fontsize=30)
