@@ -2,10 +2,87 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
+sns.set(font_scale=2)
+import pandas
 import scipy.optimize as spc
 
 def OOR2(x, p1):
     return p1/(x**2)
+
+def PlotFVLC_sphere(positions, LC_factors,detector_specs):
+    '''For a given geometry, plot the light collection as a function of
+    that axis (x,y,or z supported)'''
+    R3_FV = detector_specs['radius']**3 
+    data_dict = {'x': [], 'y': [], 'z': [], 'R3': [], 'LC': []} 
+    axis_dict = {'x':0, 'y':1, 'z':2} 
+    for a in axis_dict: 
+        for j,lc in enumerate(LC_factors[0:10000]): 
+            data_dict[a].append(int(positions[j][axis_dict[a]])) 
+    for a in axis_dict:
+        data_dict[a] = np.array(data_dict[a]) 
+    for j, pos in enumerate(LC_factors[0:10000]):
+        data_dict['R3'].append((np.sqrt(data_dict['x'][j]**2 + data_dict['y'][j]**2 + \
+                data_dict['z'][j]**2)**3)/
+                R3_FV)
+        data_dict['LC'] = 100*np.array(LC_factors[0:10000])/(4.0*np.pi)
+    plt.plot(data_dict['R3'],data_dict['LC'],marker='o',linewidth=0,markersize=8)
+    plt.xlabel(r'$(R/R_{PMT})^{3}$',fontsize=24)
+    plt.ylabel('PC%',fontsize=24)
+    plt.title("Effective photocoverage in WATCHMAN",fontsize=30)
+    plt.legend(fontsize=22)
+    plt.ion()
+    plt.show()
+
+def PlotFVLC_cylinder(positions, LC_factors,detector_specs,griddims=[38,38]):
+    '''For a given geometry, plot the light collection as a function of
+    that axis (x,y,or z supported)'''
+    rho2_FV = detector_specs['radius']**2 
+    data_dict = {'x': [], 'y': [], 'z': [], 'rho2': [], 'LC': []} 
+    axis_dict = {'x':0, 'y':1, 'z':2} 
+    for a in axis_dict: 
+        for j,lc in enumerate(LC_factors): 
+            data_dict[a].append(int(positions[j][axis_dict[a]])) 
+    for j, pos in enumerate(LC_factors):
+        data_dict['rho2'].append((data_dict['x'][j]**2 + data_dict['y'][j]**2)/
+                rho2_FV)
+    data_dict['LC'] = 100*np.array(LC_factors)/(4.0*np.pi)
+    data_pd = pandas.DataFrame(data=data_dict)
+    #We have to re-bin our data according to the input griddims
+    rhobins = np.linspace(0, data_pd.rho2.max(),griddims[1]+1)
+    zbins = np.linspace(data_pd.z.min(), data_pd.z.max(), griddims[0]+1)
+    all_bins = []
+    for j in xrange(len(zbins)):
+        if j == 0: continue
+        data_thisz = data_pd[data_pd.z > zbins[j-1]]
+        data_thisz = data_thisz[data_pd.z < zbins[j]]
+        data_thisz['zavg'] = pandas.Series(np.ones(len(data_thisz.z))*\
+                np.mean(data_thisz.z),index=data_thisz.index)
+        print(data_thisz) 
+        rho2_binned = data_thisz.groupby(pandas.cut(data_thisz.rho2, rhobins))
+        rho2_binned = rho2_binned.aggregate(np.mean)
+        rho2_binned.z = rho2_binned.z.astype(int)
+        rho2_binned.zavg = rho2_binned.zavg.astype(int)
+        rho2_binned.rho2 = np.round(rho2_binned.rho2,2)
+        rho2_binned.LC = np.round(rho2_binned.LC,2)
+        all_bins.append(rho2_binned) 
+    therealdeal = None
+    for j,b in enumerate(all_bins):
+        if j==0: 
+            therealdeal = b
+        else:
+            therealdeal=pandas.concat([therealdeal,b],ignore_index=True)
+    print(therealdeal)
+    hm = therealdeal.pivot(index='zavg',columns='rho2', values='LC')
+    #print(hm) 
+    ax = sns.heatmap(hm,cmap=plt.get_cmap('ocean'),\
+            cbar_kws={'label':'PC%'})
+    plt.xlabel(r'$(\rho/\rho_{PMT})^{2}$',fontsize=24)
+    plt.ylabel(r'$Z \, (mm)$',fontsize=24)
+    plt.title("Effective photocoverage in WATCHMAN",fontsize=30)
+    plt.legend(fontsize=22)
+    plt.ion()
+    plt.show()
+
 
 def PlotLightCollection(positions, LC_factors, axis=None):
     '''For a given axis, plot the light collection as a function of
