@@ -16,6 +16,8 @@ import json
 if __name__=='__main__':
     print("########### WELCOME TO WATCH SHAPES ############")
     print("###### LET'S HAVE SOME FUN WITH GEOMETRY #######")
+    
+    
     ####### BEGIN MODIFIERS #######
     #PMT Specs 
     NUMPMTS = 11900
@@ -34,8 +36,9 @@ if __name__=='__main__':
     #Results Saved specs 
     OUTFILE = 'results_%s.json'%(geometry) 
     NUM_SAMPLES = 10000
-    
     ######## END MODIFIERS #########
+
+    
     WATCHMAN = d.DetectorWorkshop(geometry=geometry)
     WATCHMAN.SetMediumDensity(DENSITY) 
     WATCHMAN.SetAttenuationLength(ATTENUATION_LENGTH)
