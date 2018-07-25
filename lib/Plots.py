@@ -37,6 +37,25 @@ def PlotFVLC_sphere(positions, LC_factors,detector_specs):
     plt.ion()
     plt.show()
 
+def PlotFVLC_cylinder_wdata(therealdeal,griddims=[20,20],hbounds=None):
+    '''Takes the return from PlotFVLC_cylinder() and re-plots everything without
+    having to send the data to a pandas dataframe again'''
+    hm = therealdeal.pivot(index='zavg',columns='rho2', values='LC')
+    #print(hm)
+    if hbounds is None:
+        ax = sns.heatmap(hm,cmap=plt.get_cmap('RdYlGn'),\
+                cbar_kws={'label':r'$\Delta$PC%'})
+    else:
+        ax = sns.heatmap(hm,cmap=plt.get_cmap('Spectral'),\
+                cbar_kws={'label':'DeltaPC%'},vmin=hbounds[0],
+                vmax=hbounds[1])
+    plt.xlabel(r'$(\rho/\rho_{PMT})^{2}$',fontsize=24)
+    plt.ylabel(r'$Z \, (mm)$',fontsize=24)
+    plt.title("Effective photocoverage in WATCHMAN",fontsize=30)
+    plt.legend(fontsize=22)
+    plt.ion()
+    plt.show()
+
 def PlotFVLC_cylinder(positions, LC_factors,detector_specs,griddims=[20,20],hbounds=None):
     '''For a given geometry, plot the light collection as a function of
     that axis (x,y,or z supported)'''
@@ -91,7 +110,8 @@ def PlotFVLC_cylinder(positions, LC_factors,detector_specs,griddims=[20,20],hbou
     plt.legend(fontsize=22)
     plt.ion()
     plt.show()
-
+    return therealdeal
+ 
 
 def PlotLightCollection(positions, LC_factors, axis=None):
     '''For a given axis, plot the light collection as a function of

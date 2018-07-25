@@ -143,16 +143,19 @@ class DetectorWorkshop(object):
             #Shoot for radius, phi, and z.  Convert r,phi to x,y.
             r = radius*(u**(1.0/2.0))
             phi = np.random.random() * 2.0 * np.pi
-            if plane=='zeq0':
-                z = 0.0
+            if plane is not None:
+                if plane=='side':
+                    z = np.random.random()*height
+                    z = z - (height/2.0)
+                    r = radius
+                if plane=='top':
+                    z = height/2.0
+                if plane=='bottom':
+                    z = -height/2.0
+                if plane=='zeq0':
+                    z = 0.0 
                 x = r * np.cos(phi)
                 y = r * np.sin(phi) 
-                return np.array([x,y,z])
-            elif axis is None:
-                z = np.random.random()*height
-                z = z - (height/2.0)
-                x = r * np.cos(phi)
-                y = r * np.sin(phi)
                 return np.array([x,y,z])
             elif axis is not None:
                 for a in axis_dict: 
@@ -164,6 +167,14 @@ class DetectorWorkshop(object):
                             thevar = ((np.random.random() * height) - height/2.0)
                         xyz[axis_dict[a]] = thevar 
                 return xyz
+            elif axis is None and plane is None:
+                z = np.random.random()*height
+                z = z - (height/2.0)
+                x = r * np.cos(phi)
+                y = r * np.sin(phi)
+                return np.array([x,y,z])
+            else:
+                print("ONLY DEFINE AN AXIS OR PLANE TO SHOOT POINTS ON")
 
     def EvaluateLightCollection(self, position):
         '''For a single position, evaluate the light collection parameter'''
