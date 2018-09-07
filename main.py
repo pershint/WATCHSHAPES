@@ -19,8 +19,11 @@ if __name__=='__main__':
     
     
     ####### BEGIN MODIFIERS #######
+    #Use point segment monte carlo?  If False, hemispheres used
+    USESEG = True
+    frac_exposed = 0.5  #Hemisphere cathode; should match analytical
     #PMT Specs 
-    NUMPMTS = 11900
+    NUMPMTS = 4800
     PR = 127.0   #PMT RADIUS in millimeters
     CENTRAL_POINTING = False 
     #Detector Specs 
@@ -35,6 +38,8 @@ if __name__=='__main__':
     HEIGHT = 16000.0 #Height of detector (cylinder only) in millimeters
     #Results Saved specs 
     OUTFILE = 'results_%s.json'%(geometry) 
+    if USESEG is True:
+        OUTFILE = 'results_%s_useseg.json'%(geometry)
     NUM_SAMPLES = 10000
     ######## END MODIFIERS #########
 
@@ -55,8 +60,17 @@ if __name__=='__main__':
         pointGen = pp.CylinderPoints(numpoints = NUMPMTS, radius=RADIUS,height=HEIGHT)
         pointGen.PopulatePositions()
         pointGen.ShowPositions()
-    PMTInformation = pmt.PMTGen(PointGeometry=pointGen,PMTRadius=PR)
-    PMTInformation.BuildPMTDirections(face_center=CENTRAL_POINTING)
+    
+    PMTInformation = None
+    if USESEG is False:
+        PMTInformation = pmt.PMTGen(PointGeometry=pointGen,PMTRadius=PR)
+        PMTInformation.BuildPMTDirections(face_center=CENTRAL_POINTING)
+
+    elif USESEG is True:
+        PMTInformation = pmt.SegSurfaceGen(PointGeometry=pointGen,PMTRadius=PR,
+                frac_exposed = frac_exposed)
+        PMTInformation.BuildPMTDirections(face_center=CENTRAL_POINTING)
+        PMTInformation.BuildPMTSurfacePoints() 
     
     WATCHMAN.LoadPMTInfo(PMTInformation) 
     WATCHMAN.SetRadius(RADIUS)
@@ -69,8 +83,8 @@ if __name__=='__main__':
         FVposition = WATCHMAN.ShootPosition(axis='x', region='FV')
         fv_positions.append(FVposition)
         fv_positions_outsave.append(list(FVposition))
-        light_factors.append(WATCHMAN.EvaluateLightCollection(fv_positions[j]))
-    results_dict = {'detector_specs':WATCHMAN.shape, 'FV_specs':WATCHMAN.fiducial_shape,
+        light_factors.append(WATCHMAN.EvaluateLightCollection(fv_positions[j],UseSegSurface=USESEG))
+    results_dict = {'use_seg_mc':USESEG, 'detector_specs':WATCHMAN.shape, 'FV_specs':WATCHMAN.fiducial_shape,
             'FV_positions': fv_positions_outsave, 'light_factors': light_factors,
             'PMT_radius': WATCHMAN.PMTs.PMTRadius, 'Attenuation_coeff':WATCHMAN.attncf,
             'Medium_properties':WATCHMAN.medium}

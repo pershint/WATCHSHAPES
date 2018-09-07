@@ -45,6 +45,9 @@ class SpherePoints(GeometryPoints):
         super(SpherePoints, self).__init__(numpoints=numpoints)
         self.radius = radius
         self.geometry = "SPHERE"
+        self.numpoints = numpoints
+        self.positions = None
+
     #source: https://stackoverflow.com/questions/9600801/evenly-distributing-
     #n-points-on-a-sphere
     def PopulatePositions(self, randomize=False):

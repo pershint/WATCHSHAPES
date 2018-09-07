@@ -1,6 +1,7 @@
 from mpl_toolkits.mplot3d import axes3d
 import matplotlib.pyplot as plt
 import numpy as np
+import PointGeometries as pg
 
 class PMTGen(object):
     '''Class takes in a geometry of points and can build PMT direction and
@@ -76,3 +77,37 @@ class PMTGen(object):
                         if face == "side":
                             self.directions.append(\
                                     [-pos[0]/xy_norm,-pos[1]/xy_norm,0])
+
+class SegSurfaceGen(PMTGen):
+    def __init__(self,PointGeometry=None, PMTRadius=254.0, frac_exposed=(2.0-np.sqrt(2))):
+        super(SegSurfaceGen,self).__init__(PointGeometry=PointGeometry,PMTRadius=PMTRadius)
+        self.frac_exposed = frac_exposed
+        self.SA = 4*np.pi*(self.PMTRadius**2)*self.frac_exposed
+        self.PMTFacePosns = []
+
+    def setFracExposed(self):
+        '''Set what fraction of the PMT 'sphere' is actually photocathode.
+        default is currently at frac. of sphere exposed for 45 degrees'''
+
+    def BuildPMTSurfacePoints(self):
+        '''Function builds an array of points on a spherical surface of PMT radius
+        covering only the fraction of PMT surface chosen to generate.  These are used
+        to estimate the exposed surface area to any point in space'''
+        self.PMTFacePosns = []
+        self.PMTFaceDirs = []
+        #FIXME: Have to speed up shit using the [:,np.newaxis] so there's
+        #no for loop
+        for j,direc in enumerate(self.directions):
+            #Generate a sphere of points
+            PMTSphere = pg.SpherePoints(numpoints=1000,radius=self.PMTRadius)
+            PMTSphere.PopulatePositions()
+            SpherePosns = np.array(PMTSphere.positions)
+            smags = np.sqrt(np.sum(SpherePosns*SpherePosns,axis=1))
+            indices = np.where((np.sum(direc*SpherePosns,axis=1)/smags)<=
+                -(self.frac_exposed/2))[0]
+            PMTFacePosns = SpherePosns[indices]
+            PMTFaceDirs = PMTFacePosns*(1.0/np.sqrt(np.sum(PMTFacePosns*PMTFacePosns,axis=1)))[:,np.newaxis]
+            #Now, shift the points on the sphere all to be located around the PMT position
+            PMTFacePosns = PMTFacePosns + self.positions[j]
+            self.PMTFacePosns.append(PMTFacePosns)
+            self.PMTFaceDirs.append(PMTFaceDirs)

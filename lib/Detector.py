@@ -176,13 +176,19 @@ class DetectorWorkshop(object):
             else:
                 print("ONLY DEFINE AN AXIS OR PLANE TO SHOOT POINTS ON")
 
-    def EvaluateLightCollection(self, position):
+    def EvaluateLightCollection(self, position,UseSegSurface=False):
         '''For a single position, evaluate the light collection parameter'''
         PMTPos = np.array(self.PMTs.positions)
         PMTDir = np.array(self.PMTs.directions)
         ObsPos = np.array(position)
         atn_factors = self._GetAttenuationFactors(PMTPos,ObsPos)
-        solid_angles = self._GetExposedSolidAngles(PMTPos, PMTDir, ObsPos)
+        if UseSegSurface is False:
+            solid_angles = self._GetExposedSolidAngles(PMTPos, PMTDir, ObsPos)
+        else:
+            PMTFacePosns= self.PMTs.PMTFacePosns
+            PMTFaceDirs = self.PMTs.PMTFaceDirs
+            PMTFaceExposed = self.PMTs.frac_exposed
+            solid_angles = self._GetExposedSolidAngles_SS(PMTFacePosns,PMTFaceDirs,ObsPos,PMTFaceExposed)
         light_collection_metric = np.sum(atn_factors*solid_angles)
         return light_collection_metric
 
@@ -195,7 +201,27 @@ class DetectorWorkshop(object):
         r_mags = np.sqrt(np.sum(r*r,axis=1)) 
         attn_factors = np.ones(len(r_mags))*self.attncf
         return np.exp(-r_mags*attn_factors) 
-    
+   
+    def _GetExposedSolidAngles_SS(self,PMTFaces,PMTFaceDirs,ObsPos,frac_exposed):
+        '''Return the exposed solid angle of PMT surface from each PMT
+        face using the populated PMT dot positions relative to ObsPos [x,y,z]'''
+        losses = []
+        #FIXME: Have to speed up shit using the [:,np.newaxis] so there's
+        #no for loop
+        print("ENTERING FACE LOOP")
+        for j,face in enumerate(PMTFaces):
+            vecs_to = -face + ObsPos
+            PMTFaceDirs[j] = PMTFaceDirs[j]*(1.0/np.sqrt(np.sum(PMTFaceDirs[j]*PMTFaceDirs[j],axis=1)))[:,np.newaxis]
+            vecs_to = vecs_to*(1/np.sqrt(np.sum(vecs_to*vecs_to,axis=1)))[:,np.newaxis]
+            visible_vecs = PMTFaceDirs[j][np.where(vecs_to*PMTFaceDirs[j]<=0)[0]]
+            loss = float(len(visible_vecs))/float(len(vecs_to))
+            losses.append(loss)
+        print("FINISHED A LOSSES LOOP")
+        losses = np.array(losses)
+        solid_angles = 4*np.pi*frac_exposed*losses
+        return solid_angles
+
+
     def _GetExposedSolidAngles(self, PMTPos, PMTDir, ObsPos):
         '''Return the exposed solid angle of PMT surface from each PMT
         position PMTPos (array of [x,y,z]) relative to the ObsPos [x,y,z].'''
