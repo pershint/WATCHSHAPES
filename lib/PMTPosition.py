@@ -82,7 +82,6 @@ class SegSurfaceGen(PMTGen):
     def __init__(self,PointGeometry=None, PMTRadius=254.0, frac_exposed=(2.0-np.sqrt(2))):
         super(SegSurfaceGen,self).__init__(PointGeometry=PointGeometry,PMTRadius=PMTRadius)
         self.frac_exposed = frac_exposed
-        self.SA = 4*np.pi*(self.PMTRadius**2)*self.frac_exposed
         self.PMTFacePosns = []
         self.PMTFaceDirs = []
         self.PMTPointRadiuses = []

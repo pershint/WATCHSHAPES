@@ -56,10 +56,15 @@ def PlotFVLC_cylinder_wdata(therealdeal,griddims=[20,20],hbounds=None):
     plt.ion()
     plt.show()
 
-def PlotFVLC_cylinder(positions, LC_factors,detector_specs,griddims=[20,20],hbounds=None):
+def PlotFVLC_cylinder(datdict,griddims=[20,20],hbounds=None):
     '''For a given geometry, plot the light collection as a function of
     that axis (x,y,or z supported)'''
-    rho2_FV = detector_specs['radius']**2 
+    positions = datdict["FV_positions"]
+    LC_factors = datdict["light_factors"]
+    detector_specs = datdict["detector_specs"]
+    FV_specs = datdict["FV_specs"]
+    rho2_FullVol = detector_specs['radius']**2 
+    rho2_FV = FV_specs["radius"]**2
     data_dict = {'x': [], 'y': [], 'z': [], 'rho2': [], 'LC': []} 
     axis_dict = {'x':0, 'y':1, 'z':2} 
     for a in axis_dict: 
@@ -67,11 +72,18 @@ def PlotFVLC_cylinder(positions, LC_factors,detector_specs,griddims=[20,20],hbou
             data_dict[a].append(int(positions[j][axis_dict[a]])) 
     for j, pos in enumerate(LC_factors):
         data_dict['rho2'].append((data_dict['x'][j]**2 + data_dict['y'][j]**2)/
-                rho2_FV)
+                rho2_FullVol)
     data_dict['LC'] = 100*np.array(LC_factors)/(4.0*np.pi)
     data_pd = pandas.DataFrame(data=data_dict)
     #We have to re-bin our data according to the input griddims
-    rhobins = np.linspace(0, data_pd.rho2.max(),griddims[1]+1)
+    rhobins = np.linspace(0, rho2_FV/rho2_FullVol, griddims[1]+1)
+    print("RHOBINS: " + str(rhobins))
+    rhobins_center = []
+    for j,b in enumerate(rhobins):
+        if j == 0:
+            continue
+        rbc = rhobins[j] - ((rhobins[j] - rhobins[j-1])/2)
+        rhobins_center.append(rbc)
     zbins = np.linspace(data_pd.z.min(), data_pd.z.max(), griddims[0]+1)
     all_bins = []
     for j in xrange(len(zbins)):
@@ -80,9 +92,10 @@ def PlotFVLC_cylinder(positions, LC_factors,detector_specs,griddims=[20,20],hbou
         data_thisz = data_thisz[data_pd.z < zbins[j]]
         data_thisz['zavg'] = pandas.Series(np.ones(len(data_thisz.z))*\
                 np.mean(data_thisz.z),index=data_thisz.index)
-        print(data_thisz) 
         rho2_binned = data_thisz.groupby(pandas.cut(data_thisz.rho2, rhobins))
         rho2_binned = rho2_binned.aggregate(np.mean)
+        #Now, set the rho2 value to the bin center, not the average
+        rho2_binned.rho2 = rhobins_center
         rho2_binned.z = rho2_binned.z.astype(int)
         rho2_binned.zavg = rho2_binned.zavg.astype(int)
         rho2_binned.rho2 = np.round(rho2_binned.rho2,2)

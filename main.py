@@ -27,11 +27,11 @@ if __name__=='__main__':
     ####### BEGIN MODIFIERS #######
     #Use point segment monte carlo?  If False, hemispheres used
     USESEG = True 
-    frac_exposed = 0.5  #Hemisphere cathode; should match analytical
+    frac_pmt_exposed = 0.25 #Consistent with 60 deg. top conic part open
     #PMT Specs 
     NUMPMTS = 4800
     PR = 127.0   #PMT RADIUS in millimeters
-    CENTRAL_POINTING = False 
+    CENTRAL_POINTING = True 
     #Detector Specs 
     geometry = "CYLINDER"
     DEFINE_DETECTOR_VIA_BUFFER = True #if true, RADUIS & HEIGHT defns overwritten with
@@ -74,7 +74,7 @@ if __name__=='__main__':
 
     elif USESEG is True:
         PMTInformation = pmt.SegSurfaceGen(PointGeometry=pointGen,PMTRadius=PR,
-                frac_exposed = frac_exposed)
+                frac_exposed = frac_pmt_exposed)
         PMTInformation.BuildPMTDirections(face_center=CENTRAL_POINTING)
         PMTInformation.BuildPMTSurfacePoints() 
     
