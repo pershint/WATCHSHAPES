@@ -12,6 +12,12 @@ import lib.PMTPosition as pmt
 import lib.Detector as d
 import numpy as np
 import json
+import sys
+
+def restart_line():
+    sys.stdout.flush()
+    sys.stdout.write('\r')
+    sys.stdout.flush()
 
 if __name__=='__main__':
     print("########### WELCOME TO WATCH SHAPES ############")
@@ -20,14 +26,14 @@ if __name__=='__main__':
     
     ####### BEGIN MODIFIERS #######
     #Use point segment monte carlo?  If False, hemispheres used
-    USESEG = True
+    USESEG = True 
     frac_exposed = 0.5  #Hemisphere cathode; should match analytical
     #PMT Specs 
     NUMPMTS = 4800
     PR = 127.0   #PMT RADIUS in millimeters
     CENTRAL_POINTING = False 
     #Detector Specs 
-    geometry = "SPHERE"
+    geometry = "CYLINDER"
     DEFINE_DETECTOR_VIA_BUFFER = True #if true, RADUIS & HEIGHT defns overwritten with
                                       #the FV + BUFFER dimension
     BUFFER_STANDOFF = 2000.0 #Desired buffer volume 
@@ -80,7 +86,11 @@ if __name__=='__main__':
     fv_positions_outsave = []
     light_factors = []
     for j in xrange(NUM_SAMPLES):
-        FVposition = WATCHMAN.ShootPosition(axis='x', region='FV')
+        if (j/17) == float(j)/17:
+            progress = str(round(float(j)*100/NUM_SAMPLES,2))
+            restart_line()
+            sys.stdout.write("PRODUCTION PROGRESS: %s %%"%(progress))
+        FVposition = WATCHMAN.ShootPosition(region='FV')
         fv_positions.append(FVposition)
         fv_positions_outsave.append(list(FVposition))
         light_factors.append(WATCHMAN.EvaluateLightCollection(fv_positions[j],UseSegSurface=USESEG))

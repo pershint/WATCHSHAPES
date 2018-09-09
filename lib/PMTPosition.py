@@ -84,30 +84,111 @@ class SegSurfaceGen(PMTGen):
         self.frac_exposed = frac_exposed
         self.SA = 4*np.pi*(self.PMTRadius**2)*self.frac_exposed
         self.PMTFacePosns = []
+        self.PMTFaceDirs = []
+        self.PMTPointRadiuses = []
 
     def setFracExposed(self):
         '''Set what fraction of the PMT 'sphere' is actually photocathode.
         default is currently at frac. of sphere exposed for 45 degrees'''
 
-    def BuildPMTSurfacePoints(self):
+    def ShowPMTFacePosns(self):
+        if len(self.positions)<=0 or len(self.directions)<=0:
+            print("No positions or directions have been filled yet.")
+            return
+        else:
+            fig = plt.figure()
+            ax = fig.gca(projection='3d')
+            x, y, z = [], [], []
+            for i in np.arange(0,len(self.PMTFacePosns), len(self.positions)/50):
+                for j in xrange(len(self.PMTFacePosns[i])):
+                    x.append(self.PMTFacePosns[i][j][0])
+                    y.append(self.PMTFacePosns[i][j][1])
+                    z.append(self.PMTFacePosns[i][j][2])
+            ax.scatter(x,y, z)
+            ax.set_xlabel("X position (mm)", fontsize=22)
+            ax.set_ylabel("Y position (mm)", fontsize=22)
+            ax.set_zlabel("Z position (mm)", fontsize=22)
+            for t in ax.zaxis.get_major_ticks(): t.label.set_fontsize(20)
+            for t in ax.yaxis.get_major_ticks(): t.label.set_fontsize(20)
+            for t in ax.xaxis.get_major_ticks(): t.label.set_fontsize(20)
+            plt.title("Points making up some of the PMT faces", fontsize=34)
+            plt.show()
+    
+    def ShowPMTFaceDirs(self):
+        if len(self.positions)<=0 or len(self.directions)<=0:
+            print("No positions or directions have been filled yet.")
+            return
+        else:
+            fig = plt.figure()
+            ax = fig.gca(projection='3d')
+            x, y, z = [], [], []
+            for i in np.arange(0,len(self.PMTFacePosns), len(self.PMTFacePosns)/3):
+                for j in xrange(len(self.PMTFacePosns[i])):
+                    x.append(self.PMTFacePosns[i][j][0])
+                    y.append(self.PMTFacePosns[i][j][1])
+                    z.append(self.PMTFacePosns[i][j][2])
+            ax.set_xlabel("X position (mm)", fontsize=22)
+            ax.set_ylabel("Y position (mm)", fontsize=22)
+            ax.set_zlabel("Z position (mm)", fontsize=22)
+            for t in ax.zaxis.get_major_ticks(): t.label.set_fontsize(20)
+            for t in ax.yaxis.get_major_ticks(): t.label.set_fontsize(20)
+            for t in ax.xaxis.get_major_ticks(): t.label.set_fontsize(20)
+            x,y,z = np.meshgrid(np.array(x),np.array(y),np.array(z))
+            u, v, w = [], [], []
+            for i in np.arange(0,len(self.PMTFaceDirs),len(self.PMTFaceDirs)/3):
+                u.append(self.PMTFaceDirs[i][j][0])
+                v.append(self.PMTFaceDirs[i][j][1])
+                w.append(self.PMTFaceDirs[i][j][2])
+            ax.quiver(x,y, z, u, v, w)
+            plt.title("PMT positions and directions for given geometry")
+            plt.show()
+
+    def BuildPMTSurfacePoints(self,pointresolution=1000):
         '''Function builds an array of points on a spherical surface of PMT radius
         covering only the fraction of PMT surface chosen to generate.  These are used
         to estimate the exposed surface area to any point in space'''
+        
         self.PMTFacePosns = []
         self.PMTFaceDirs = []
-        #FIXME: Have to speed up shit using the [:,np.newaxis] so there's
-        #no for loop
-        for j,direc in enumerate(self.directions):
-            #Generate a sphere of points
-            PMTSphere = pg.SpherePoints(numpoints=1000,radius=self.PMTRadius)
-            PMTSphere.PopulatePositions()
-            SpherePosns = np.array(PMTSphere.positions)
-            smags = np.sqrt(np.sum(SpherePosns*SpherePosns,axis=1))
-            indices = np.where((np.sum(direc*SpherePosns,axis=1)/smags)<=
-                -(self.frac_exposed/2))[0]
-            PMTFacePosns = SpherePosns[indices]
-            PMTFaceDirs = PMTFacePosns*(1.0/np.sqrt(np.sum(PMTFacePosns*PMTFacePosns,axis=1)))[:,np.newaxis]
+            
+        PMTSphere = pg.SpherePoints(numpoints=pointresolution,radius=self.PMTRadius)
+        PMTSphere.PopulatePositions()
+        SpherePosns = np.array(PMTSphere.positions)
+        PMTDirections = np.array(self.directions)
+        smag = self.PMTRadius
+        thedot_test =np.sum(SpherePosns*PMTDirections[:,np.newaxis],axis=2)
+        exp_check = (thedot_test/smag)
+        ExposedPMTPoints = []
+        PMTFaceDirs = []
+        PMTPointRadiuses = np.sqrt(4.0 * self.PMTRadius**2 / pointresolution)
+        for j,PMTSphereDotProds in enumerate(exp_check):
+            indices = np.where(PMTSphereDotProds>=(1.0-2*self.frac_exposed))[0]
+            ExposedPMT = np.array(SpherePosns[indices])
+            #if each point is a disk on the PMT's surface, calculate the radius of each point assuming
+            #it represents a disk that's some fraction of the surface area
+            ExposedDir= ExposedPMT/(smag)
+            #Normalized and points point outward from sphere in ExposedPMT,
+            #So they're ready to represent a point's exposure direction
+            PMTFaceDirs.append(ExposedDir)
             #Now, shift the points on the sphere all to be located around the PMT position
-            PMTFacePosns = PMTFacePosns + self.positions[j]
-            self.PMTFacePosns.append(PMTFacePosns)
-            self.PMTFaceDirs.append(PMTFaceDirs)
+            ExposedPMT = ExposedPMT + self.positions[j]
+            ExposedPMTPoints.append(ExposedPMT)
+        self.PMTFacePosns=ExposedPMTPoints
+        self.PMTFaceDirs=PMTFaceDirs
+        self.PMTPointRadiuses = PMTPointRadiuses
+        self.ShowPMTFacePosns()
+#        self.ShowPMTFaceDirs()
+#        for j,direc in enumerate(self.directions):
+#            #Generate a sphere of points
+#            PMTSphere = pg.SpherePoints(numpoints=1000,radius=self.PMTRadius)
+#            PMTSphere.PopulatePositions()
+#            SpherePosns = np.array(PMTSphere.positions)
+#            smags = np.sqrt(np.sum(SpherePosns*SpherePosns,axis=1))
+#            indices = np.where((np.sum(direc*SpherePosns,axis=1)/smags)<=
+#                -(self.frac_exposed/2))[0]
+#            PMTFacePosns = SpherePosns[indices]
+#            PMTFaceDirs = PMTFacePosns*(1.0/np.sqrt(np.sum(PMTFacePosns*PMTFacePosns,axis=1)))[:,np.newaxis]
+#            #Now, shift the points on the sphere all to be located around the PMT position
+#            PMTFacePosns = PMTFacePosns + self.positions[j]
+#            self.PMTFacePosns.append(PMTFacePosns)
+#            self.PMTFaceDirs.append(PMTFaceDirs)

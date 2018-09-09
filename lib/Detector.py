@@ -188,7 +188,9 @@ class DetectorWorkshop(object):
             PMTFacePosns= self.PMTs.PMTFacePosns
             PMTFaceDirs = self.PMTs.PMTFaceDirs
             PMTFaceExposed = self.PMTs.frac_exposed
-            solid_angles = self._GetExposedSolidAngles_SS(PMTFacePosns,PMTFaceDirs,ObsPos,PMTFaceExposed)
+            PMTPointRadiuses = self.PMTs.PMTPointRadiuses
+            solid_angles = self._GetExposedSolidAngles_SS(PMTFacePosns,PMTFaceDirs,
+                    PMTPointRadiuses,ObsPos,PMTFaceExposed)
         light_collection_metric = np.sum(atn_factors*solid_angles)
         return light_collection_metric
 
@@ -202,23 +204,28 @@ class DetectorWorkshop(object):
         attn_factors = np.ones(len(r_mags))*self.attncf
         return np.exp(-r_mags*attn_factors) 
    
-    def _GetExposedSolidAngles_SS(self,PMTFaces,PMTFaceDirs,ObsPos,frac_exposed):
+    def _GetExposedSolidAngles_SS(self,PMTFaces,PMTFaceDirs,PMTPointRadiuses,ObsPos,frac_exposed):
         '''Return the exposed solid angle of PMT surface from each PMT
         face using the populated PMT dot positions relative to ObsPos [x,y,z]'''
-        losses = []
+        solid_angles = []
         #FIXME: Have to speed up shit using the [:,np.newaxis] so there's
         #no for loop
-        print("ENTERING FACE LOOP")
         for j,face in enumerate(PMTFaces):
-            vecs_to = -face + ObsPos
-            PMTFaceDirs[j] = PMTFaceDirs[j]*(1.0/np.sqrt(np.sum(PMTFaceDirs[j]*PMTFaceDirs[j],axis=1)))[:,np.newaxis]
-            vecs_to = vecs_to*(1/np.sqrt(np.sum(vecs_to*vecs_to,axis=1)))[:,np.newaxis]
-            visible_vecs = PMTFaceDirs[j][np.where(vecs_to*PMTFaceDirs[j]<=0)[0]]
-            loss = float(len(visible_vecs))/float(len(vecs_to))
-            losses.append(loss)
-        print("FINISHED A LOSSES LOOP")
-        losses = np.array(losses)
-        solid_angles = 4*np.pi*frac_exposed*losses
+            vecs_to =  (ObsPos - face)
+            vecs_to_dist = np.array(np.sqrt(np.sum(vecs_to*vecs_to,axis=1)))
+            vecs_to_norm = vecs_to*(1/np.sqrt(np.sum(vecs_to*vecs_to,axis=1)))[:,np.newaxis]
+            vecdotdir = np.sum(vecs_to_norm*PMTFaceDirs[j],axis=1)
+            isvis_indices =np.where(vecdotdir>=0)[0]
+            
+            visible_dists = vecs_to_dist[isvis_indices]
+            visible_costhetas = np.array(vecdotdir[isvis_indices])
+            #Now, assume each point on the sphere is a disk with it's respective
+            #fraction of the total PMT's surface area.  Calculate the exposed
+            #solid angle for that disk
+            solid_angle_pmtsurf = 2*np.pi*(1 - (visible_dists/(np.sqrt(PMTPointRadiuses**2 + \
+                    visible_dists**2))))*visible_costhetas
+            #Total solid angle visible on this PMT is the sum of all the above points
+            solid_angles.append(np.sum(solid_angle_pmtsurf))
         return solid_angles
 
 
