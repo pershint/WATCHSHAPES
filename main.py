@@ -27,7 +27,7 @@ if __name__=='__main__':
     ####### BEGIN MODIFIERS #######
     #Use point segment monte carlo?  If False, hemispheres used
     USESEG = True 
-    frac_pmt_exposed = 0.25 #Consistent with 60 deg. top conic part open
+    frac_pmt_exposed = 0.50 #Consistent with 60 deg. top conic part open
     #PMT Specs 
     NUMPMTS = 4800
     PR = 127.0   #PMT RADIUS in millimeters
@@ -46,7 +46,7 @@ if __name__=='__main__':
     OUTFILE = 'results_%s.json'%(geometry) 
     if USESEG is True:
         OUTFILE = 'results_%s_useseg.json'%(geometry)
-    NUM_SAMPLES = 10000
+    NUM_SAMPLES = 10
     ######## END MODIFIERS #########
 
     

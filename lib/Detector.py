@@ -222,8 +222,16 @@ class DetectorWorkshop(object):
             #Now, assume each point on the sphere is a disk with it's respective
             #fraction of the total PMT's surface area.  Calculate the exposed
             #solid angle for that disk
-            solid_angle_pmtsurf = 2*np.pi*(1 - (visible_dists/(np.sqrt(PMTPointRadiuses**2 + \
-                    visible_dists**2))))*visible_costhetas
+            #solid_angle_pmtsurf = 2*np.pi*(1 - (visible_dists/(np.sqrt(PMTPointRadiuses**2 + \
+            #        visible_dists**2))))*visible_costhetas
+            #So the above isn't right; the solid angle subtended by the angled disk is
+            #Actually an ellipse
+            #For approximation being used, see
+            #slideshare.net/hcr1991/solid-angle-subtended-by-an-elliptical-
+            #plane-at-any-point-lying-on-the-axis
+            solid_angle_pmtsurf = 2*np.pi*(1 - (1.0/(np.sqrt(1.0+
+                    (visible_costhetas*(PMTPointRadiuses**2)/ 
+                    ((visible_dists-PMTPointRadiuses*visible_costhetas)**2))))))
             #Total solid angle visible on this PMT is the sum of all the above points
             solid_angles.append(np.sum(solid_angle_pmtsurf))
         return solid_angles
