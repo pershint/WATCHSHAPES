@@ -231,7 +231,7 @@ class DetectorWorkshop(object):
             #plane-at-any-point-lying-on-the-axis
             solid_angle_pmtsurf = 2*np.pi*(1 - (1.0/(np.sqrt(1.0+
                     (visible_costhetas*(PMTPointRadiuses**2)/ 
-                    ((visible_dists-PMTPointRadiuses*visible_costhetas)**2))))))
+                    (visible_dists**2))))))
             #Total solid angle visible on this PMT is the sum of all the above points
             solid_angles.append(np.sum(solid_angle_pmtsurf))
         return solid_angles
