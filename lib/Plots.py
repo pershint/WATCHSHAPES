@@ -40,13 +40,15 @@ def PlotFVLC_sphere(positions, LC_factors,detector_specs):
 def PlotFVLC_cylinder_wdata(therealdeal,griddims=[20,20],hbounds=None):
     '''Takes the return from PlotFVLC_cylinder() and re-plots everything without
     having to send the data to a pandas dataframe again'''
+    import seaborn as sns
+    sns.set(font_scale=2)
     hm = therealdeal.pivot(index='zavg',columns='rho2', values='LC')
     #print(hm)
     if hbounds is None:
-        ax = sns.heatmap(hm,cmap=plt.get_cmap('RdYlGn'),\
-                cbar_kws={'label':r'$\Delta$PC%'})
+        ax = sns.heatmap(hm,cmap=plt.get_cmap('RdYlGn_r'),\
+                cbar_kws={'label':r'$\Delta$PC'})
     else:
-        ax = sns.heatmap(hm,cmap=plt.get_cmap('Spectral'),\
+        ax = sns.heatmap(hm,cmap=plt.get_cmap('jet_r'),\
                 cbar_kws={'label':'DeltaPC%'},vmin=hbounds[0],
                 vmax=hbounds[1])
     plt.xlabel(r'$(\rho/\rho_{PMT})^{2}$',fontsize=24)
